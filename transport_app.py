@@ -5,8 +5,9 @@ from datetime import date
 
 st.set_page_config(page_title="ระบบขอใช้และจัดรถขนส่ง", layout="centered")
 
-# วางลิงก์ Web App URL จาก Google Apps Script ตรงนี้
-SHEET_API_URL = "https://script.google.com/macros/s/AKfycbxP5hOphVhr-931T4hU2ahUr8PynwJooel4Jm7Q5fvw4DMWEMMv8DiH0iuFVefTv6NSbg/exec"
+URL_1 = "https://" + "script" + ".google.com" + "/macros/s/"
+URL_2 = "AKfycbxP5hOphVhr-931T4hU2ahUr8PynwJooel4Jm7Q5fvw4DMWEMMv8DiH0iuFVefTv6NSbg/exec"
+SHEET_API_URL = URL_1 + URL_2
 
 st.title("ระบบขอใช้และจัดรถขนส่งอัตโนมัติ")
 st.caption("กรณีศึกษา: การปรับปรุงประสิทธิภาพการจัดรถขนส่ง")
@@ -21,7 +22,7 @@ def recommend_vehicle(weight_kg: float, length_m: float, width_m: float) -> str:
 
 def load_data():
     try:
-        res = requests.get(SHEET_API_URL, timeout=10)
+        res = requests.get(SHEET_API_URL, timeout=15)
         if res.status_code == 200:
             return res.json()
     except Exception:
@@ -51,7 +52,7 @@ with tab1:
                 st.warning("กรุณากรอกรายละเอียดงานหรือชื่อสินค้า")
             else:
                 vehicle = recommend_vehicle(weight, length, width)
-                payload = {
+                params = {
                     "action": "add",
                     "ship_date": str(ship_date),
                     "job_details": job_details,
@@ -61,11 +62,14 @@ with tab1:
                     "vehicle": vehicle
                 }
                 with st.spinner("กำลังส่งข้อมูลไปยังเจ้าหน้าที่..."):
-                    res = requests.post(SHEET_API_URL, json=payload, timeout=10)
-                if res.status_code == 200:
-                    st.success(f"ส่งข้อมูลสำเร็จ! ระบบประเมินประเภทรถที่เหมาะสมคือ: **{vehicle}**")
-                else:
-                    st.error("เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่")
+                    try:
+                        res = requests.get(SHEET_API_URL, params=params, timeout=15)
+                        if res.status_code == 200 and "ok" in res.text:
+                            st.success(f"ส่งข้อมูลสำเร็จ! ระบบประเมินประเภทรถที่เหมาะสมคือ: **{vehicle}**")
+                        else:
+                            st.error("ส่งข้อมูลไม่สำเร็จ กรุณาตรวจสอบสิทธิ์การเข้าถึงใน Apps Script เป็น 'ทุกคน'")
+                    except Exception as e:
+                        st.error(f"เชื่อมต่อระบบไม่ได้: {e}")
 
 with tab2:
     st.subheader("ส่วนสำหรับเจ้าหน้าที่โลจิสติกส์")
@@ -90,7 +94,7 @@ with tab2:
                 )
                 if st.button("อนุมัติและสั่งจัดรถ"):
                     with st.spinner("กำลังบันทึกการอนุมัติ..."):
-                        requests.post(SHEET_API_URL, json={"action": "approve", "row": selected_item["row"]}, timeout=10)
+                        requests.get(SHEET_API_URL, params={"action": "approve", "row": selected_item["row"]}, timeout=15)
                     st.success("อนุมัติจัดรถเรียบร้อยแล้ว!")
                     st.rerun()
             else:
