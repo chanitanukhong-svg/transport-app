@@ -1,10 +1,15 @@
 import streamlit as st
 import pandas as pd
+import requests
 from datetime import date
 
 st.set_page_config(page_title="ระบบขอใช้และจัดรถขนส่ง", layout="centered")
+
+# วางลิงก์ Web App URL จาก Google Apps Script ตรงนี้
+SHEET_API_URL = "https://script.google.com/macros/s/AKfycbxP5hOphVhr-931T4hU2ahUr8PynwJooel4Jm7Q5fvw4DMWEMMv8DiH0iuFVefTv6NSbg/exec"
+
 st.title("ระบบขอใช้และจัดรถขนส่งอัตโนมัติ")
-st.caption("กรณีศึกษา: การปรับปรุงประสิทธิภาพการจัดรถขนส่ง (ลดเวลาและป้องกันการจัดรถผิดประเภท)")
+st.caption("กรณีศึกษา: การปรับปรุงประสิทธิภาพการจัดรถขนส่ง")
 
 def recommend_vehicle(weight_kg: float, length_m: float, width_m: float) -> str:
     if weight_kg <= 750 and length_m <= 2.2 and width_m <= 1.5:
@@ -14,16 +19,17 @@ def recommend_vehicle(weight_kg: float, length_m: float, width_m: float) -> str:
     else:
         return "รถเทรลเลอร์"
 
-if "records" not in st.session_state:
-    st.session_state.records = [
-        {"วันที่ขนส่ง": "2026-10-16", "รายละเอียดงาน (Job Details)": "รับแผ่นเหล็กร้าน S-tech (Bay ตัด)", "น้ำหนัก (กก.)": 70.1, "ยาว (ม.)": 1.22, "กว้าง (ม.)": 1.22, "ประเภทรถที่แนะนำ": "รถกระบะ", "สถานะ": "อนุมัติแล้ว"},
-        {"วันที่ขนส่ง": "2026-10-25", "รายละเอียดงาน (Job Details)": "คืน Pipe 18 นิ้ว PAE จำนวน 1 เส้น", "น้ำหนัก (กก.)": 440.0, "ยาว (ม.)": 6.00, "กว้าง (ม.)": 0.46, "ประเภทรถที่แนะนำ": "รถ 6 ล้อ", "สถานะ": "อนุมัติแล้ว"},
-        {"วันที่ขนส่ง": "2026-10-28", "รายละเอียดงาน (Job Details)": "ขนส่งท่ออุตสาหกรรมขนาดใหญ่", "น้ำหนัก (กก.)": 16000.0, "ยาว (ม.)": 9.00, "กว้าง (ม.)": 0.60, "ประเภทรถที่แนะนำ": "รถเทรลเลอร์", "สถานะ": "รออนุมัติ"},
-    ]
+def load_data():
+    try:
+        res = requests.get(SHEET_API_URL, timeout=10)
+        if res.status_code == 200:
+            return res.json()
+    except Exception:
+        pass
+    return []
 
 tab1, tab2 = st.tabs(["1. ฟอร์มขอใช้รถ (หน้างานสแกน QR)", "2. ฐานข้อมูลและอนุมัติจัดรถ (เจ้าหน้าที่)"])
 
-# --- แท็บที่ 1: ผู้ขอใช้บริการกรอกข้อมูล ---
 with tab1:
     st.subheader("แบบฟอร์มขอข้อมูลการขนส่ง")
     with st.form("request_form", clear_on_submit=True):
@@ -45,41 +51,54 @@ with tab1:
                 st.warning("กรุณากรอกรายละเอียดงานหรือชื่อสินค้า")
             else:
                 vehicle = recommend_vehicle(weight, length, width)
-                st.session_state.records.append({
-                    "วันที่ขนส่ง": str(ship_date),
-                    "รายละเอียดงาน (Job Details)": job_details,
-                    "น้ำหนัก (กก.)": weight,
-                    "ยาว (ม.)": length,
-                    "กว้าง (ม.)": width,
-                    "ประเภทรถที่แนะนำ": vehicle,
-                    "สถานะ": "รออนุมัติ"
-                })
-                st.success(f"บันทึกข้อมูลสำเร็จ! ระบบประเมินประเภทรถที่เหมาะสมคือ: **{vehicle}**")
+                payload = {
+                    "action": "add",
+                    "ship_date": str(ship_date),
+                    "job_details": job_details,
+                    "weight": weight,
+                    "length": length,
+                    "width": width,
+                    "vehicle": vehicle
+                }
+                with st.spinner("กำลังส่งข้อมูลไปยังเจ้าหน้าที่..."):
+                    res = requests.post(SHEET_API_URL, json=payload, timeout=10)
+                if res.status_code == 200:
+                    st.success(f"ส่งข้อมูลสำเร็จ! ระบบประเมินประเภทรถที่เหมาะสมคือ: **{vehicle}**")
+                else:
+                    st.error("เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่")
 
-# --- แท็บที่ 2: เจ้าหน้าที่โลจิสติกส์ (ล็อกรหัสผ่าน) ---
 with tab2:
     st.subheader("ส่วนสำหรับเจ้าหน้าที่โลจิสติกส์")
     pin = st.text_input("กรอกรหัสผ่านเจ้าหน้าที่เพื่อเข้าดูและอนุมัติจัดรถ", type="password", placeholder="กรอกรหัสผ่าน...")
- 
+    
     if pin == "1234":
-        df = pd.DataFrame(st.session_state.records)
-        st.dataframe(df, use_container_width=True)
-        
-        pending_indices = [i for i, r in enumerate(st.session_state.records) if r["สถานะ"] == "รออนุมัติ"]
-        if pending_indices:
-            st.markdown("### ตรวจสอบและอนุมัติคำขอ")
-            selected_idx = st.selectbox(
-                "เลือกรายการที่ต้องการอนุมัติ",
-                pending_indices,
-                format_func=lambda i: f"#{i+1} | {st.session_state.records[i]['รายละเอียดงาน (Job Details)']} ({st.session_state.records[i]['ประเภทรถที่แนะนำ']})"
-            )
-            if st.button("อนุมัติและสั่งจัดรถ"):
-                st.session_state.records[selected_idx]["สถานะ"] = "อนุมัติแล้ว"
-                st.rerun()
+        if st.button("รีเฟรชข้อมูลล่าสุด"):
+            st.rerun()
+            
+        records = load_data()
+        if records:
+            df = pd.DataFrame(records).drop(columns=["row"], errors="ignore")
+            st.dataframe(df, use_container_width=True)
+            
+            pending = [r for r in records if r.get("สถานะ") == "รออนุมัติ"]
+            if pending:
+                st.markdown("### ตรวจสอบและอนุมัติคำขอ")
+                selected_item = st.selectbox(
+                    "เลือกรายการที่ต้องการอนุมัติ",
+                    pending,
+                    format_func=lambda r: f"แถวที่ {r['row']} | {r['รายละเอียดงาน (Job Details)']} ({r['ประเภทรถที่แนะนำ']})"
+                )
+                if st.button("อนุมัติและสั่งจัดรถ"):
+                    with st.spinner("กำลังบันทึกการอนุมัติ..."):
+                        requests.post(SHEET_API_URL, json={"action": "approve", "row": selected_item["row"]}, timeout=10)
+                    st.success("อนุมัติจัดรถเรียบร้อยแล้ว!")
+                    st.rerun()
+            else:
+                st.info("ไม่มีรายการที่รออนุมัติในขณะนี้")
                 
-        csv = df.to_csv(index=False).encode("utf-8-sig")
-        st.download_button("ดาวน์โหลดข้อมูลเป็นไฟล์ CSV / Excel", data=csv, file_name="transport_records.csv", mime="text/csv")
+            csv = df.to_csv(index=False).encode("utf-8-sig")
+            st.download_button("ดาวน์โหลดข้อมูลเป็นไฟล์ CSV / Excel", data=csv, file_name="transport_records.csv", mime="text/csv")
+        else:
+            st.info("ยังไม่มีข้อมูลการขอใช้รถในระบบ")
     elif pin != "":
         st.error("รหัสผ่านไม่ถูกต้อง")
-
-   
