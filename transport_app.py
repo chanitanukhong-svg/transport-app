@@ -6,7 +6,6 @@ st.set_page_config(page_title="ระบบขอใช้และจัดร�
 st.title("ระบบขอใช้และจัดรถขนส่งอัตโนมัติ")
 st.caption("กรณีศึกษา: การปรับปรุงประสิทธิภาพการจัดรถขนส่ง (ลดเวลาและป้องกันการจัดรถผิดประเภท)")
 
-# ฟังก์ชันประเมินประเภทรถอัตโนมัติตามขนาดและน้ำหนัก
 def recommend_vehicle(weight_kg: float, length_m: float, width_m: float) -> str:
     if weight_kg <= 750 and length_m <= 2.2 and width_m <= 1.5:
         return "รถกระบะ"
@@ -15,7 +14,6 @@ def recommend_vehicle(weight_kg: float, length_m: float, width_m: float) -> str:
     else:
         return "รถเทรลเลอร์"
 
-# สร้างฐานข้อมูลจำลองใน Session (เริ่มต้นด้วยตัวอย่างข้อมูลจากรายงาน)
 if "records" not in st.session_state:
     st.session_state.records = [
         {"วันที่ขนส่ง": "2026-10-16", "รายละเอียดงาน (Job Details)": "รับแผ่นเหล็กร้าน S-tech (Bay ตัด)", "น้ำหนัก (กก.)": 70.1, "ยาว (ม.)": 1.22, "กว้าง (ม.)": 1.22, "ประเภทรถที่แนะนำ": "รถกระบะ", "สถานะ": "อนุมัติแล้ว"},
@@ -58,25 +56,30 @@ with tab1:
                 })
                 st.success(f"บันทึกข้อมูลสำเร็จ! ระบบประเมินประเภทรถที่เหมาะสมคือ: **{vehicle}**")
 
-# --- แท็บที่ 2: เจ้าหน้าที่โลจิสติกส์ตรวจสอบและอนุมัติ ---
+# --- แท็บที่ 2: เจ้าหน้าที่โลจิสติกส์ (ล็อกรหัสผ่าน) ---
 with tab2:
-    st.subheader("รายการขอใช้รถแบบ Real-time")
-    df = pd.DataFrame(st.session_state.records)
-    st.dataframe(df, use_container_width=True)
+    st.subheader("ส่วนสำหรับเจ้าหน้าที่โลจิสติกส์")
+    pin = st.text_input("กรอกรหัสผ่านเจ้าหน้าที่เพื่อเข้าดูและอนุมัติจัดรถ", type="password", placeholder="รหัสผ่าน: 1234")
     
-    # ส่วนอนุมัติรายการที่รออนุมัติ
-    pending_indices = [i for i, r in enumerate(st.session_state.records) if r["สถานะ"] == "รออนุมัติ"]
-    if pending_indices:
-        st.markdown("### ตรวจสอบและอนุมัติคำขอ")
-        selected_idx = st.selectbox(
-            "เลือกรายการที่ต้องการอนุมัติ",
-            pending_indices,
-            format_func=lambda i: f"#{i+1} | {st.session_state.records[i]['รายละเอียดงาน (Job Details)']} ({st.session_state.records[i]['ประเภทรถที่แนะนำ']})"
-        )
-        if st.button("อนุมัติและสั่งจัดรถ"):
-            st.session_state.records[selected_idx]["สถานะ"] = "อนุมัติแล้ว"
-            st.rerun()
-            
-    # ปุ่มดาวน์โหลดรายงานเป็น Excel
-    csv = df.to_csv(index=False).encode("utf-8-sig")
-    st.download_button("ดาวน์โหลดข้อมูลเป็นไฟล์ CSV / Excel", data=csv, file_name="transport_records.csv", mime="text/csv")
+    if pin == "1234":
+        df = pd.DataFrame(st.session_state.records)
+        st.dataframe(df, use_container_width=True)
+        
+        pending_indices = [i for i, r in enumerate(st.session_state.records) if r["สถานะ"] == "รออนุมัติ"]
+        if pending_indices:
+            st.markdown("### ตรวจสอบและอนุมัติคำขอ")
+            selected_idx = st.selectbox(
+                "เลือกรายการที่ต้องการอนุมัติ",
+                pending_indices,
+                format_func=lambda i: f"#{i+1} | {st.session_state.records[i]['รายละเอียดงาน (Job Details)']} ({st.session_state.records[i]['ประเภทรถที่แนะนำ']})"
+            )
+            if st.button("อนุมัติและสั่งจัดรถ"):
+                st.session_state.records[selected_idx]["สถานะ"] = "อนุมัติแล้ว"
+                st.rerun()
+                
+        csv = df.to_csv(index=False).encode("utf-8-sig")
+        st.download_button("ดาวน์โหลดข้อมูลเป็นไฟล์ CSV / Excel", data=csv, file_name="transport_records.csv", mime="text/csv")
+    elif pin != "":
+        st.error("รหัสผ่านไม่ถูกต้อง")
+
+   
