@@ -59,8 +59,8 @@ with tab1:
 # --- แท็บที่ 2: เจ้าหน้าที่โลจิสติกส์ (ล็อกรหัสผ่าน) ---
 with tab2:
     st.subheader("ส่วนสำหรับเจ้าหน้าที่โลจิสติกส์")
-    pin = st.text_input("กรอกรหัสผ่านเจ้าหน้าที่เพื่อเข้าดูและอนุมัติจัดรถ", type="password", placeholder="รหัสผ่าน: 1234")
-    
+    pin = st.text_input("กรอกรหัสผ่านเจ้าหน้าที่เพื่อเข้าดูและอนุมัติจัดรถ", type="password", placeholder="กรอกรหัสผ่าน...")
+ 
     if pin == "1234":
         df = pd.DataFrame(st.session_state.records)
         st.dataframe(df, use_container_width=True)
